@@ -4,6 +4,8 @@ const url=require('url');
 const myModule=require('./myModule.js');
 const fs=require('fs');
 const path=require('path');
+var Promise = require('es6-promise').Promise;
+
 let mimes={
   '.html':'text/html',
   '.css':'text/css',
@@ -19,31 +21,51 @@ console.log('__dirname',__dirname);
 myModule();
 
 
+function fileAccess(filepath){
+  return new Promise((resolve,reject)=>{
+    fs.access(filepath,fs.F_OK , error=>{
+      if (!error){
+        resolve(filepath);
+      }
+      else{
+        reject(error);
+      }
+    })
+  });
+}
+
+function fileReader(filepath){
+  return new Promise((resolve,reject)=>{
+    fs.readFile(filepath,(error,content)=>{
+      if(!error){
+        resolve(content);
+
+      }else{
+        reject(error);
+      }
+    });
+  })
+}
+
+
 function webserver(req,res){
   let baseURI=url.parse(req.url);
   let filepath=baseURI.pathname === '/' ? './index.htm' : baseURI.pathname;
-  console.log(filepath);
-  fs.access(filepath,fs.F_OK , error=>{
-    if (!error){
-        fs.readFile(filepath,(error,content)=>{
-          if(!error){
-            let contentType=mimes[path.extname(filepath)];
-            res.writeHead(200,{'Content-Type':contentType});
-            res.end(content,'utf-8');
+  let contentType=mimes[path.extname(filepath)];
 
-          }else{
-            res.writeHead(500);
-            res.end('The server cannot read the file');
-          }
+  fileAccess(filepath)
+    .then(fileReader)
+    .then(content=> {
+      res.writeHead(200,{'Content-Type':contentType});
+      res.end(content,'utf-8');
 
-        });
-    }
-    else{
+    })
+    .catch(error=>{
       res.writeHead(404);
-      res.end('Não encontrado');
-    }
+      res.end(JSON.stringify(error));
 
-  })
+    })
+
 
 }
 
